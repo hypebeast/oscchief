@@ -1,8 +1,8 @@
 P=oscchief
 OBJECTS=
 CC=gcc
-CFLAGS=-Wextra -Wall -Wno-missing-field-initializers -Wno-unused-parameter -std=gnu99 -ggdb -Wno-unused-function $(EXTRA_CFLAGS)
-LDLIBS=
+CFLAGS=`pkg-config --static --cflags liblo` -Wextra -Wall -Wno-missing-field-initializers -Wno-unused-parameter -std=gnu99 -ggdb -Wno-unused-function
+LDLIBS=`pkg-config --static --libs liblo`
 
 prefix=/usr/local
 
@@ -10,7 +10,7 @@ prefix=/usr/local
 all: oscchief
 
 $(P): main.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDLIBS) $(LDFLAGS) -o $@ $^
 
 clean:
 	rm -rf $(P) *.dSYM
