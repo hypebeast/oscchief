@@ -6,13 +6,17 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <limits.h>
+#include <errno.h>
 #include <lo/lo.h>
 
 #define VERSION "0.0.1"
 
 
 /**
- * Prints the usage.
+ * Prints the usage text.
 */
 void usage()
 {
@@ -25,15 +29,17 @@ void usage()
 	printf("    OSCADDRESS: TODO\n");
 	printf("    TYPES: OSC type tags. Supported types:\n");
 	printf("      i: Integer 32 Bit\n");
-	printf("      i: Integer 32 Bit\n");
-	printf("      i: Integer 32 Bit\n");
-	printf("      i: Integer 32 Bit\n");
-	printf("      i: Integer 32 Bit\n");
-	printf("      i: Integer 32 Bit\n");
-	printf("      i: Integer 32 Bit\n");
-	printf("      i: Integer 32 Bit\n\n");
-	printf("Example usage:\n");
+	printf("      h: Integer 64 Bit\n");
+	printf("      f: Float\n");
+	printf("      d: Double\n");
+	printf("      c: Char\n");
+	printf("      s: String\n");
+	printf("      T: True (no argument required)\n");
+	printf("      F: False (no argument required)\n");
+	printf("      N: Nil (no argument required)\n\n");
+	printf("Examples:\n");
 	printf("    oscchief 192.168.0.10 7028 /osc/address ssiiii some integers 10 12 8 786\n");
+	printf("    oscchief 192.168.0.10 7028 /osc/address TTiFi 643 98\n");
 }
 
 /**
@@ -43,6 +49,7 @@ void usage()
  */
 lo_message create_message(char **argv)
 {
+	char const *types;
 	lo_message message;
 
 	// Arg 1: Hostname
@@ -55,10 +62,163 @@ lo_message create_message(char **argv)
 	message = lo_message_new();
 
 	// Get the length of the type tags
+	int numberOfArgs;
+	if (argv[4] == NULL)
+	{
+		// An empty type string is allowed
+		numberOfArgs = 0;
+	}
+	else
+	{
+		types = argv[4];
+		numberOfArgs = strlen(types);
+	}
 
-	// Handle every argument (handle every OSC type)
+	// Handle every argument
+	int offset = 5;
+	char const *arg;
+	for (int i = 0; i < numberOfArgs; ++i)
+	{
+		arg = argv[i+offset];
+		if (arg == NULL)
+		{
+			fprintf(stderr, "Argument %d not found.\n", i + 1);
+			goto EXIT;
+		}
+
+		switch(types[i])
+		{
+			case LO_INT32:
+			{
+				int64_t val;
+				char *endptr;
+
+				errno = 0;
+				val = strtol(arg, &endptr, 10);
+				if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN))
+					|| (errno != 0 && val == 0))
+				{
+					fprintf(stderr, "Could not parse argument %d '%s' as INT32.\n", i+1, arg);
+					goto EXIT;
+				}
+
+				if (val > INT_MAX || val < INT_MIN)
+				{
+					fprintf(stderr, "Could not parse argument %d '%s' as INT32.\n", i+1, arg);
+					goto EXIT;
+				}
+
+				if (endptr == arg)
+				{
+					fprintf(stderr, "Could not parse argument %d '%s' as INT32.\n", i+1, arg);
+					goto EXIT;
+				}
+
+				if (lo_message_add_int32(message, (int32_t)val) < 0)
+				{
+					fprintf(stderr, "Could not add argument %d '%s' to the OSC message.\n", i+1, arg);
+					goto EXIT;	
+				}
+			}
+			break;
+
+			case LO_INT64:
+			{
+				int64_t val;
+				char *endptr;
+
+				errno = 0;
+				val = strtol(arg, &endptr, 10);
+				if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN))
+					|| (errno != 0 && val == 0))
+				{
+					fprintf(stderr, "Could not parse argument %d '%s' as INT64.\n", i+1, arg);
+					goto EXIT;
+				}
+
+				if (val > LONG_MAX || val < LONG_MIN)
+				{
+					fprintf(stderr, "Could not parse argument %d '%s' as INT64.\n", i+1, arg);
+					goto EXIT;
+				}
+
+				if (endptr == arg)
+				{
+					fprintf(stderr, "Could not parse argument %d '%s' as INT64.\n", i+1, arg);
+					goto EXIT;
+				}
+
+				if (lo_message_add_int64(message, val) < 0)
+				{
+					fprintf(stderr, "Could not add argument %d '%s' to the OSC message.\n", i+1, arg);
+					goto EXIT;	
+				}
+			}
+			break;
+
+			case LO_FLOAT:
+			{
+				float val;
+				char *endptr;
+
+				errno = 0;
+				val = strtof(arg, &endptr);
+				if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN))
+					|| (errno != 0 && val == 0))
+				{
+					fprintf(stderr, "Could not parse argument %d '%s' as FLOAT.\n", i+1, arg);
+					goto EXIT;
+				}
+
+				if (val > LONG_MAX || val < LONG_MIN)
+				{
+					fprintf(stderr, "Could not parse argument %d '%s' as FLOAT.\n", i+1, arg);
+					goto EXIT;
+				}
+
+				if (endptr == arg)
+				{
+					fprintf(stderr, "Could not parse argument %d '%s' as FLOAT.\n", i+1, arg);
+					goto EXIT;
+				}
+
+				if (lo_message_add_int64(message, val) < 0)
+				{
+					fprintf(stderr, "Could not add argument %d '%s' to the OSC message.\n", i+1, arg);
+					goto EXIT;	
+				}
+			}
+			break;
+
+			case LO_DOUBLE:
+				break;
+
+			case LO_CHAR:
+				break;
+
+			case LO_STRING:
+				break;
+
+			case LO_TRUE:
+				break;
+
+			case LO_FALSE:
+				break;
+
+			case LO_NIL:
+				break;
+
+			default:
+				fprintf(stderr, "Type '%c' is not supported.", types[i]);
+				goto EXIT;
+		}
+	}
 
 	return message;
+
+EXIT:
+	lo_message_free(message);
+	return NULL;
 }
 
 int main(int argc, char **argv)
@@ -68,6 +228,8 @@ int main(int argc, char **argv)
 		usage();
 		exit(1);
 	}
+
+	// TODO: Check if got some optional arguments
 
 	if (argv[1] == NULL)
 	{
