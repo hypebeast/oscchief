@@ -7,7 +7,7 @@ LDLIBS=`pkg-config --static --libs liblo`
 prefix=/usr/local
 
 
-all: oscchief
+all: $(P)
 
 $(P): main.c
 	$(CC) $(CFLAGS) $(LDLIBS) $(LDFLAGS) -o $@ $^

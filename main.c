@@ -9,6 +9,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <limits.h>
+#include <float.h>
+#include <math.h>
 #include <errno.h>
 #include <lo/lo.h>
 
@@ -25,8 +27,8 @@ void usage()
 	printf("usage: oscchief HOST PORT OSCADDRESS TYPES ARGUMENTS\n\n");
 	printf("positional arguments:\n");
 	printf("    HOST: IP address of the host where you want to send your OSC message\n");
-	printf("    PORT: TODO\n");
-	printf("    OSCADDRESS: TODO\n");
+	printf("    PORT: Port number\n");
+	printf("    OSCADDRESS: OSC address where you want to send your message\n");
 	printf("    TYPES: OSC type tags. Supported types:\n");
 	printf("      i: Integer 32 Bit\n");
 	printf("      h: Integer 64 Bit\n");
@@ -75,11 +77,11 @@ lo_message create_message(char **argv)
 	}
 
 	// Handle every argument
-	int offset = 5;
+	int index = 5;
 	char const *arg;
 	for (int i = 0; i < numberOfArgs; ++i)
 	{
-		arg = argv[i+offset];
+		arg = argv[index];
 		if (arg == NULL)
 		{
 			fprintf(stderr, "Argument %d not found.\n", i + 1);
@@ -119,6 +121,7 @@ lo_message create_message(char **argv)
 					fprintf(stderr, "Could not add argument %d '%s' to the OSC message.\n", i+1, arg);
 					goto EXIT;	
 				}
+				index++;
 			}
 			break;
 
@@ -153,6 +156,7 @@ lo_message create_message(char **argv)
 					fprintf(stderr, "Could not add argument %d '%s' to the OSC message.\n", i+1, arg);
 					goto EXIT;	
 				}
+				index++;
 			}
 			break;
 
@@ -163,14 +167,8 @@ lo_message create_message(char **argv)
 
 				errno = 0;
 				val = strtof(arg, &endptr);
-				if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN))
-					|| (errno != 0 && val == 0))
-				{
-					fprintf(stderr, "Could not parse argument %d '%s' as FLOAT.\n", i+1, arg);
-					goto EXIT;
-				}
-
-				if (val > LONG_MAX || val < LONG_MIN)
+				if ((errno == ERANGE && val == HUGE_VALF)
+					|| (errno == ERANGE && val == 0))
 				{
 					fprintf(stderr, "Could not parse argument %d '%s' as FLOAT.\n", i+1, arg);
 					goto EXIT;
@@ -182,16 +180,43 @@ lo_message create_message(char **argv)
 					goto EXIT;
 				}
 
-				if (lo_message_add_int64(message, val) < 0)
+				if (lo_message_add_float(message, val) < 0)
 				{
 					fprintf(stderr, "Could not add argument %d '%s' to the OSC message.\n", i+1, arg);
 					goto EXIT;	
 				}
+				index++;
 			}
 			break;
 
 			case LO_DOUBLE:
-				break;
+			{
+				double val;
+				char *endptr;
+
+				errno = 0;
+				val = strtod(arg, &endptr);
+				if ((errno == ERANGE && val == HUGE_VAL)
+					|| (errno == ERANGE && val == 0))
+				{
+					fprintf(stderr, "Could not parse argument %d '%s' as DOUBLE.\n", i+1, arg);
+					goto EXIT;
+				}
+
+				if (endptr == arg)
+				{
+					fprintf(stderr, "Could not parse argument %d '%s' as DOUBLE.\n", i+1, arg);
+					goto EXIT;
+				}
+
+				if (lo_message_add_double(message, val) < 0)
+				{
+					fprintf(stderr, "Could not add argument %d '%s' to the OSC DOUBLE.\n", i+1, arg);
+					goto EXIT;	
+				}
+				index++;
+			}
+			break;
 
 			case LO_CHAR:
 				break;
@@ -200,16 +225,37 @@ lo_message create_message(char **argv)
 				break;
 
 			case LO_TRUE:
-				break;
+			{
+				if (lo_message_add_true(message) < 0)
+				{
+					fprintf(stderr, "Could not add argument %d to the OSC message.\n", i+1);
+					goto EXIT;
+				}
+			}
+			break;
 
 			case LO_FALSE:
-				break;
+			{
+				if (lo_message_add_nil(message) < 0)
+				{
+					fprintf(stderr, "Could not add argument %d to the OSC message.\n", i+1);
+					goto EXIT;
+				}
+			}
+			break;
 
 			case LO_NIL:
-				break;
+			{
+				if (lo_message_add_true(message) < 0)
+				{
+					fprintf(stderr, "Could not add argument %d  to the OSC message.\n", i+1);
+					goto EXIT;
+				}
+			}
+			break;
 
 			default:
-				fprintf(stderr, "Type '%c' is not supported.", types[i]);
+				fprintf(stderr, "Type '%c' is not supported.\n", types[i]);
 				goto EXIT;
 		}
 	}
