@@ -30,15 +30,15 @@ void usage()
 	printf("    PORT: Port number\n");
 	printf("    OSCADDRESS: OSC address where you want to send your message\n");
 	printf("    TYPES: OSC type tags. Supported types:\n");
-	printf("      i: Integer 32 Bit\n");
-	printf("      h: Integer 64 Bit\n");
-	printf("      f: Float\n");
-	printf("      d: Double\n");
-	printf("      c: Char\n");
-	printf("      s: String\n");
-	printf("      T: True (no argument required)\n");
-	printf("      F: False (no argument required)\n");
-	printf("      N: Nil (no argument required)\n\n");
+	printf("        %c - 32 Bit integer\n", LO_INT32);
+	printf("        %c - 64 Bit integer\n", LO_INT64);
+	printf("        %c - 32 Bit float\n", LO_FLOAT);
+	printf("        %c - 64 Bit double\n", LO_DOUBLE);
+	printf("        %c - Char\n", LO_CHAR);
+	printf("        %c - String\n", LO_STRING);
+	printf("        %c - True (no argument required)\n", LO_TRUE);
+	printf("        %c - False (no argument required)\n", LO_FALSE);
+	printf("        %c - Nil (no argument required)\n\n", LO_NIL);
 	printf("Examples:\n");
 	printf("    oscchief 192.168.0.10 7028 /osc/address ssiiii some integers 10 12 8 786\n");
 	printf("    oscchief 192.168.0.10 7028 /osc/address TTiFi 643 98\n");
@@ -211,7 +211,7 @@ lo_message create_message(char **argv)
 
 				if (lo_message_add_double(message, val) < 0)
 				{
-					fprintf(stderr, "Could not add argument %d '%s' to the OSC DOUBLE.\n", i+1, arg);
+					fprintf(stderr, "Could not add argument %d '%s' to the OSC message.\n", i+1, arg);
 					goto EXIT;	
 				}
 				index++;
@@ -219,7 +219,21 @@ lo_message create_message(char **argv)
 			break;
 
 			case LO_CHAR:
-				break;
+			{
+				if (strlen(arg) != 1)
+				{
+					fprintf(stderr, "Only single byte char is allowed.\n");
+					goto EXIT;
+				}
+
+				if (lo_message_add_char(message, arg[0]) < 0)
+				{
+					fprintf(stderr, "Could not add argument %d '%s' to the OSC message.\n", i+1, arg);
+					goto EXIT;	
+				}
+				index++;
+			}
+			break;
 
 			case LO_STRING:
 				break;
