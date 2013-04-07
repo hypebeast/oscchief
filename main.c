@@ -79,13 +79,17 @@ lo_message create_message(char **argv)
 	// Handle every argument
 	int index = 5;
 	char const *arg;
-	for (int i = 0; i < numberOfArgs; ++i)
+	for (int i = 0; i < numberOfArgs; i++)
 	{
-		arg = argv[index];
-		if (arg == NULL)
+		if (types[i] != LO_FALSE && types[i] != LO_TRUE
+			&& types[i] != LO_NIL)
 		{
-			fprintf(stderr, "Argument %d not found.\n", i + 1);
-			goto EXIT;
+			arg = argv[index];
+			if (arg == NULL)
+			{
+				fprintf(stderr, "Argument %d not found.\n", i + 1);
+				goto EXIT;
+			}	
 		}
 
 		switch(types[i])
@@ -236,7 +240,14 @@ lo_message create_message(char **argv)
 			break;
 
 			case LO_STRING:
-				break;
+			{
+				if (lo_message_add_string(message, arg) < 0)
+				{
+					fprintf(stderr, "Could not add argument %d '%s' to the OSC message.\n", i+1, arg);
+					goto EXIT;
+				}
+			}
+			break;
 
 			case LO_TRUE:
 			{
