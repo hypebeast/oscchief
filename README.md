@@ -89,7 +89,7 @@ If you want to send only a OSC packet and no arguments:
 
 	$ oscchief send 192.168.0.10 7028 /osc/address
 
-### Server Usage
+#### Server Usage
 
 To listen on port 7028 for incoming OSC packets use the following command:
 
