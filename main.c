@@ -1,8 +1,24 @@
-//
-// This part is part of the OscChief project.
-//
-// Copyright 2013, Sebastian Ruml <sebastian@sebastianruml.com>
-//
+/* oscchief - Sends and receives OSC messages. 
+ *
+ * Copyright (c) 2013 Sebastian Ruml
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ * of the Software, and to permit persons to whom the Software is furnished to do
+ * so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,9 +28,10 @@
 #include <float.h>
 #include <math.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <lo/lo.h>
 
-#define VERSION "0.0.1"
+#define VERSION "0.1.0"
 
 
 /**
@@ -23,8 +40,9 @@
 void usage()
 {
 	printf("oscchief Version %s\n", VERSION);
-	printf("Copyright (C) 2013 Sebastian Ruml <sebastian.ruml@gmail.com>\n");
-	printf("usage: oscchief HOST PORT OSCADDRESS TYPES ARGUMENTS\n\n");
+	printf("Copyright (C) 2013 Sebastian Ruml <sebastian.ruml@gmail.com>\n\n");
+	printf("usage: oscchief send HOST PORT OSCADDRESS TYPES ARGUMENTS\n");
+	printf("       oscchief listen PORT\n\n");
 	printf("positional arguments:\n");
 	printf("    HOST: IP address of the host where you want to send your OSC message\n");
 	printf("    PORT: Port number\n");
@@ -39,9 +57,38 @@ void usage()
 	printf("        %c - True (no argument required)\n", LO_TRUE);
 	printf("        %c - False (no argument required)\n", LO_FALSE);
 	printf("        %c - Nil (no argument required)\n\n", LO_NIL);
+	printf("optional arguments:\n");
+	printf("     -h - Shows this help message\n\n");
 	printf("Examples:\n");
-	printf("    oscchief 192.168.0.10 7028 /osc/address ssiiii some integers 10 12 8 786\n");
-	printf("    oscchief 192.168.0.10 7028 /osc/address TTiFi 643 98\n");
+	printf("    oscchief send 192.168.0.10 7028 /osc/address %c%c%c%c%c some integers 10 12 786\n",
+			LO_STRING, LO_STRING, LO_INT32, LO_INT32, LO_INT32);
+	printf("    oscchief send 192.168.0.10 7028 /osc/address %c%c%c%c%c 643 98\n",
+			LO_TRUE, LO_TRUE, LO_INT32, LO_FALSE, LO_INT32);
+	printf("    oscchief send 192.168.0.10 7028 /osc/address\n");
+	printf("    oscchief send 192.168.0.10 7028 /osc/address %c%c\n", LO_TRUE, LO_FALSE);
+	printf("    oscchief listen 7028\n");
+}
+
+void errorHandler(int num, const char *msg, const char *where)
+{
+	printf("Server error %d in address %s: %s\n", num, msg, where);
+}
+
+/**
+ * Message handler for incoming OSC messages.
+ */
+int messageHandler(const char *address, const char *types, lo_arg **argv, int argc, lo_message msg, void *user_data)
+{
+	printf("%s %s", address, types);
+
+	for (int i = 0; i < argc; i++)
+	{
+		printf(" ");
+		lo_arg_pp((lo_type)types[i], argv[i]);
+	}
+	printf("\n");
+
+	return 0;
 }
 
 /**
@@ -54,30 +101,30 @@ lo_message create_message(char **argv)
 	char const *types;
 	lo_message message;
 
-	// Arg 1: Hostname
-	// Arg 2: OSC Port
-	// Arg 3: OSC Address
-	// Arg 4: Type Tags
-	// Arg 5: Arguments
+	// Arg 2: Hostname
+	// Arg 3: OSC Port
+	// Arg 4: OSC Address
+	// Arg 5: Type Tags
+	// Arg 6: Arguments
 
 	// Build a new message
 	message = lo_message_new();
 
 	// Get the length of the type tags
 	int numberOfArgs;
-	if (argv[4] == NULL)
+	if (argv[5] == NULL)
 	{
 		// An empty type string is allowed
 		numberOfArgs = 0;
 	}
 	else
 	{
-		types = argv[4];
+		types = argv[5];
 		numberOfArgs = strlen(types);
 	}
 
 	// Handle every argument
-	int index = 5;
+	int index = 6;
 	char const *arg;
 	for (int i = 0; i < numberOfArgs; i++)
 	{
@@ -261,7 +308,7 @@ lo_message create_message(char **argv)
 
 			case LO_FALSE:
 			{
-				if (lo_message_add_nil(message) < 0)
+				if (lo_message_add_false(message) < 0)
 				{
 					fprintf(stderr, "Could not add argument %d to the OSC message.\n", i+1);
 					goto EXIT;
@@ -271,7 +318,7 @@ lo_message create_message(char **argv)
 
 			case LO_NIL:
 			{
-				if (lo_message_add_true(message) < 0)
+				if (lo_message_add_nil(message) < 0)
 				{
 					fprintf(stderr, "Could not add argument %d  to the OSC message.\n", i+1);
 					goto EXIT;
@@ -294,52 +341,111 @@ EXIT:
 
 int main(int argc, char **argv)
 {
-	if (argc < 4)
+	bool runAsServer = false;
+
+	if (argc < 2)
 	{
 		usage();
 		exit(1);
 	}
 
-	// TODO: Check if got some optional arguments
-
-	if (argv[1] == NULL)
+	// Handle optional arguments
+	char *firstArg = argv[1];
+	if (strcmp(firstArg, "-h") == 0)
 	{
-		fprintf(stderr, "No hostname is given.\n");
+		usage();
 		exit(1);
 	}
-
-	if (argv[2] == NULL)
+	else if (strcmp(firstArg, "send") == 0)
 	{
-		fprintf(stderr, "No port is specified.\n");
-		exit(1);
+		runAsServer = false;
+	}
+	else if (strcmp(firstArg, "listen") == 0)
+	{
+		runAsServer = true;
+	}
+	else
+	{
+		printf("Invalid argument(s)!\n");
+		usage();
+		exit(1);	
 	}
 
-	// Create a new address
-	lo_address target = lo_address_new(argv[1], argv[2]);
-	if (target == NULL)
+	// Run as server and listen for incoming OSC messages
+	if (runAsServer)
 	{
-		fprintf(stderr, "Failed to create %s:%s\n", argv[1], argv[2]);
-		exit(1);
+		if (argc < 3)
+		{
+			usage();
+			exit(1);
+		}
+
+		// Create new server
+		lo_server server = lo_server_new(argv[2], errorHandler);
+		if (server == NULL)
+		{
+			printf("Could not start a server with port %s", argv[3]);
+			exit(1);
+		}
+
+		// Add a message handler that matches all OSC addresses
+		lo_server_add_method(server, NULL, NULL, messageHandler, NULL);
+
+		printf("Start listening on port '%s' for incoming OSC messages...\n", argv[2]);
+
+		// Loop forever and receive OSC messages
+		for (;;)
+		{
+			lo_server_recv(server);
+		}
 	}
-
-	if (argv[3] == NULL)
+	else // Run as client
 	{
-		fprintf(stderr, "No OSC address is given\n");
-		exit(1);
-	}
+		if (argc < 5)
+		{
+			usage();
+			exit(1);
+		}
 
-	lo_message message = create_message(argv);
-	if (message == NULL)
-	{
-		fprintf(stderr, "Could not create OSC message.\n");
-		exit(1);
-	}
+		if (argv[2] == NULL)
+		{
+			fprintf(stderr, "No hostname is given.\n");
+			exit(1);
+		}
+
+		if (argv[3] == NULL)
+		{
+			fprintf(stderr, "No port is specified.\n");
+			exit(1);
+		}
+
+		// Create a new address
+		lo_address target = lo_address_new(argv[2], argv[3]);
+		if (target == NULL)
+		{
+			fprintf(stderr, "Failed to create %s:%s\n", argv[2], argv[3]);
+			exit(1);
+		}
+
+		if (argv[4] == NULL)
+		{
+			fprintf(stderr, "No OSC address is given\n");
+			exit(1);
+		}
+
+		lo_message message = create_message(argv);
+		if (message == NULL)
+		{
+			fprintf(stderr, "Could not create OSC message.\n");
+			exit(1);
+		}
 
 
-	int ret = lo_send_message(target, argv[3], message);
-	if (ret <= -1)
-	{
-		fprintf(stderr, "Error sending message.\n");
-		exit(1);
+		int ret = lo_send_message(target, argv[4], message);
+		if (ret <= -1)
+		{
+			fprintf(stderr, "Error sending message.\n");
+			exit(1);
+		}
 	}
 }
