@@ -28,32 +28,138 @@
 
     <div class="container">
       <section id="main_content">
-        <h3>Welcome to GitHub Pages.</h3>
+        <h1>oscchief</h1>
 
-<p>This automatic page generator is the easiest way to create beautiful pages for all of your projects. Author your page content here using GitHub Flavored Markdown, select a template crafted by a designer, and publish. After your page is generated, you can check out the new branch:</p>
+<p>oscchief is a command line tool for sending and receiving OSC packets. Received
+packets will be dump to stdout for further inspections.</p>
 
-<pre><code>$ cd your_repo_root/repo_name
-$ git fetch origin
-$ git checkout gh-pages
+<p>oscchief is written in C and depends only on <a href="http://liblo.sourceforge.net/">liblo</a>.
+It runs on Mac OS X and Linux.</p>
+
+<h2>Installation</h2>
+
+<p>oscchief is written in portable C and runs on Mac OS X and Linux platforms.
+Currently it's necessary to compile it from source. But this is easy and should
+not be problematic.</p>
+
+<p>In the future prebuild binaries for all supported platforms should be available.</p>
+
+<h3>Instructions</h3>
+
+<p>First, download liblo from <a href="http://liblo.sourceforge.net/">here</a> and unpack it.
+After that the following steps installs liblo:</p>
+
+<pre><code>$ cd liblo-x.xx
+$ ./configure --prefix=/usr/local
+$ make
+$ make install
 </code></pre>
 
-<p>If you're using the GitHub for Mac, simply sync your repository and you'll see the new branch.</p>
+<p>Once liblo is installed you can compile and install oscchief:</p>
 
-<h3>Designer Templates</h3>
+<pre><code>$ git clone https://github.com/hypebeast/oscchief.git oscchief
+$ cd oscchief
+$ make
+$ sudo make install
+</code></pre>
 
-<p>We've crafted some handsome templates for you to use. Go ahead and continue to layouts to browse through them. You can easily go back to edit your page before publishing. After publishing your page, you can revisit the page generator and switch to another theme. Your Page content will be preserved if it remained markdown format.</p>
+<h2>Usage</h2>
 
-<h3>Rather Drive Stick?</h3>
+<p>For showing the help message execute oscchief with the '-h' option:</p>
 
-<p>If you prefer to not use the automatic generator, push a branch named <code>gh-pages</code> to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator written by our own Tom Preston-Werner. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.</p>
+<pre><code>$ oscchief -h
+</code></pre>
 
-<h3>Authors and Contributors</h3>
+<p>The following listing shows all available options:</p>
 
-<p>You can <a href="https://github.com/blog/821" class="user-mention">@mention</a> a GitHub username to generate a link to their profile. The resulting <code>&lt;a&gt;</code> element will link to the contributor's GitHub Profile. For example: In 2007, Chris Wanstrath (<a href="https://github.com/defunkt" class="user-mention">@defunkt</a>), PJ Hyett (<a href="https://github.com/pjhyett" class="user-mention">@pjhyett</a>), and Tom Preston-Werner (<a href="https://github.com/mojombo" class="user-mention">@mojombo</a>) founded GitHub.</p>
+<pre><code>usage: oscchief send HOST PORT OSCADDRESS TYPES ARGUMENTS
+       oscchief listen PORT
 
-<h3>Support or Contact</h3>
+positional arguments:
+    HOST: IP address of the host where you want to send your OSC message
+    PORT: Port number
+    OSCADDRESS: OSC address where you want to send your message
+    TYPES: OSC type tags. Supported types:
+        i - 32 Bit integer
+        h - 64 Bit integer
+        f - 32 Bit float
+        d - 64 Bit double
+        c - Char
+        s - String
+        T - True (no argument required)
+        F - False (no argument required)
+        N - Nil (no argument required)
 
-<p>Having trouble with Pages? Check out the documentation at <a href="http://help.github.com/pages">http://help.github.com/pages</a> or contact <a href="mailto:support@github.com">support@github.com</a> and we’ll help you sort it out.</p>
+optional arguments:
+     -h - Shows this help message
+</code></pre>
+
+<p>There are two modes of operation:</p>
+
+<ul>
+<li>Client: send OSC packets</li>
+<li>Server: listen for incoming OSC packets and prints it to stdout</li>
+</ul><p>To use oscchief as an OSC client to send OSC packets use it as follows:</p>
+
+<pre><code>$ oscchief send HOST PORT OSCADRESS TYPES ARGUMENTS
+</code></pre>
+
+<p>If you want to use oscchief as a OSC server use it with following options:</p>
+
+<pre><code>$ oscchief listen PORT
+</code></pre>
+
+<h3>Examples</h3>
+
+<h4>Client Usage</h4>
+
+<p>The following command sends two integer and one boolean argument:</p>
+
+<pre><code>$ oscchief send 192.168.0.10 7028 /osc/address iTi 10 45
+</code></pre>
+
+<p>If you want to send only a OSC packet and no arguments:</p>
+
+<pre><code>$ oscchief send 192.168.0.10 7028 /osc/address
+</code></pre>
+
+<h4>Server Usage</h4>
+
+<p>To listen on port 7028 for incoming OSC packets use the following command:</p>
+
+<pre><code>$ oscchief listen 7028
+</code></pre>
+
+<h2>Credits</h2>
+
+<p>oscchief is based on the oscdump and oscsend tools from the liblo library written by
+Kentaro Fukuchi.</p>
+
+<h2>Licensing</h2>
+
+<p>oscchief is licensed under the terms of <a href="http://opensource.org/licenses/MIT">The MIT License (MIT)</a>.</p>
+
+<pre><code>/*
+ * oscdump - Receive and dump OpenSound Control messages.
+ *
+ * Copyright (C) 2008 Kentaro Fukuchi &lt;fukuchi@megaui.net&gt;
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301 USA.
+ */
+</code></pre>
       </section>
     </div>
 
