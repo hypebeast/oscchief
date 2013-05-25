@@ -31,7 +31,7 @@
 #include <stdbool.h>
 #include <lo/lo.h>
 
-#define VERSION "0.1.0"
+#define VERSION "0.2.0"
 
 
 /**
@@ -42,6 +42,7 @@ void usage()
 	printf("oscchief Version %s\n", VERSION);
 	printf("Copyright (C) 2013 Sebastian Ruml <sebastian.ruml@gmail.com>\n\n");
 	printf("usage: oscchief send HOST PORT OSCADDRESS TYPES ARGUMENTS\n");
+	printf("       oscchief send FILENAME\n");
 	printf("       oscchief listen PORT\n\n");
 	printf("positional arguments:\n");
 	printf("    HOST: IP address of the host where you want to send your OSC message\n");
@@ -294,6 +295,7 @@ lo_message create_message(char **argv)
 					goto EXIT;
 				}
 			}
+			index++;
 			break;
 
 			case LO_TRUE:
@@ -337,6 +339,138 @@ lo_message create_message(char **argv)
 EXIT:
 	lo_message_free(message);
 	return NULL;
+}
+
+/**
+ * Sends the OSC messages specified in the given file.
+ *
+ * \returns 0, if success. Otherwise, -1.
+ */
+int process_message_file(char *filename)
+{
+	if (filename == NULL)
+	{
+		return -1;
+	}
+
+	FILE *file;
+	char line_buffer[BUFSIZ];
+
+	file = fopen(filename, "r");
+	if (!file)
+	{
+		fprintf(stderr, "Couldn't open file %s for reading.\n", filename);
+		return -1;
+	}
+
+	// Process every line
+	while (fgets(line_buffer, sizeof(line_buffer), file))
+	{
+		char *argv[100];
+		// Fill the first two arguments with empty strings, so we can use the
+		// create_message() function
+		argv[0] = "";
+		argv[1] = "";
+
+		int i = 2;
+		char *part = strtok(line_buffer, " ");
+		while (part != NULL)
+		{
+			// TODO: Check if pause is specified
+
+			// Remove line endings if any
+			int len = strlen(part);
+			if (part[len-1] == '\n' || part[len-1] == '\r')
+			{
+				part[len-1] = '\0';
+			}
+
+			argv[i] = part;
+
+			// Get the next part
+			part = strtok(NULL, " ");
+
+			i++;
+		}
+
+		// Check if we got enough arguments
+		if (i < 3)
+		{
+			fprintf(stderr, "Error parsing file.\n");
+			return -1;
+		}
+
+		if (argv[2] == NULL)
+		{
+			fprintf(stderr, "No hostname is given.\n");
+			exit(1);
+		}
+
+		if (argv[3] == NULL)
+		{
+			fprintf(stderr, "No port is specified.\n");
+			exit(1);
+		}
+
+		// Create a new address
+		lo_address target = lo_address_new(argv[2], argv[3]);
+		if (target == NULL)
+		{
+			fprintf(stderr, "Failed to create %s:%s\n", argv[2], argv[3]);
+			exit(1);
+		}
+
+		if (argv[4] == NULL)
+		{
+			fprintf(stderr, "No OSC address is given\n");
+			exit(1);
+		}
+
+		printf("%s %s %s", argv[2], argv[3], argv[4]);
+
+		char *types = argv[5];
+		int argc = strlen(types);
+
+		for (int i = 0; i < argc; i++)
+		{
+			printf(" ");
+
+			if (types[i] == LO_TRUE)
+			{
+				printf("TRUE");
+			}
+			else if (types[i] == LO_FALSE)
+			{
+				printf("FALSE");
+			}
+			else if (types[i] == LO_NIL)
+			{
+				printf("NIL");
+			}
+			else
+			{
+				printf("%s", argv[i+6]);
+			}
+		}
+
+		printf("\n");
+
+		lo_message message = create_message(argv);
+		if (message == NULL)
+		{
+			fprintf(stderr, "Could not create OSC message.\n");
+			exit(1);
+		}
+
+		int ret = lo_send_message(target, argv[4], message);
+		if (ret <= -1)
+		{
+			fprintf(stderr, "Error sending message.\n");
+			exit(1);
+		}
+	}
+
+	return 0;
 }
 
 int main(int argc, char **argv)
@@ -401,51 +535,66 @@ int main(int argc, char **argv)
 	}
 	else // Run as client
 	{
-		if (argc < 5)
+		if (argc != 3 && argc < 5)
 		{
 			usage();
 			exit(1);
 		}
 
-		if (argv[2] == NULL)
+		// Read the file and send the specified OSC messages
+		if (argc == 3)
 		{
-			fprintf(stderr, "No hostname is given.\n");
-			exit(1);
+			printf("Reading messages from \"%s\"\n", argv[2]);
+
+			int ret = process_message_file(argv[2]);
+			if (ret < 0)
+			{
+				fprintf(stderr, "Error processing message file.\n");
+				exit(1);
+			}
 		}
-
-		if (argv[3] == NULL)
+		else if (argc >= 5)
 		{
-			fprintf(stderr, "No port is specified.\n");
-			exit(1);
-		}
+			if (argv[2] == NULL)
+			{
+				fprintf(stderr, "No hostname is given.\n");
+				exit(1);
+			}
 
-		// Create a new address
-		lo_address target = lo_address_new(argv[2], argv[3]);
-		if (target == NULL)
-		{
-			fprintf(stderr, "Failed to create %s:%s\n", argv[2], argv[3]);
-			exit(1);
-		}
+			if (argv[3] == NULL)
+			{
+				fprintf(stderr, "No port is specified.\n");
+				exit(1);
+			}
 
-		if (argv[4] == NULL)
-		{
-			fprintf(stderr, "No OSC address is given\n");
-			exit(1);
-		}
+			// Create a new address
+			lo_address target = lo_address_new(argv[2], argv[3]);
+			if (target == NULL)
+			{
+				fprintf(stderr, "Failed to create %s:%s\n", argv[2], argv[3]);
+				exit(1);
+			}
 
-		lo_message message = create_message(argv);
-		if (message == NULL)
-		{
-			fprintf(stderr, "Could not create OSC message.\n");
-			exit(1);
-		}
+			if (argv[4] == NULL)
+			{
+				fprintf(stderr, "No OSC address is given\n");
+				exit(1);
+			}
+
+			lo_message message = create_message(argv);
+			if (message == NULL)
+			{
+				fprintf(stderr, "Could not create OSC message.\n");
+				exit(1);
+			}
 
 
-		int ret = lo_send_message(target, argv[4], message);
-		if (ret <= -1)
-		{
-			fprintf(stderr, "Error sending message.\n");
-			exit(1);
+			int ret = lo_send_message(target, argv[4], message);
+			if (ret <= -1)
+			{
+				fprintf(stderr, "Error sending message.\n");
+				exit(1);
+			}
 		}
 	}
 }
